@@ -1,5 +1,3 @@
--- The script deobduscated:
-
 local vu1 = game:GetService("Players")
 local vu2 = vu1.LocalPlayer
 local vu3 = game:GetService("RunService")
