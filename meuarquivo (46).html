@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEMA DE ACESSO CENTRAL - LUAY GT</title>
+    <style>
+        :root {
+            --primary: #00ff9f;
+            --secondary: #003b25;
+            --bg: #050505;
+            --font: 'Courier New', Courier, monospace;
+            --glow: 0 0 10px rgba(0, 255, 159, 0.5);
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg);
+            color: var(--primary);
+            font-family: var(--font);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.3;
+        }
+
+        .ui-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            background: 
+                radial-gradient(circle at center, transparent 0%, rgba(0,0,0,0.8) 100%),
+                repeating-linear-gradient(0deg, rgba(0,255,159,0.03) 0px, rgba(0,255,159,0.03) 1px, transparent 1px, transparent 2px);
+            pointer-events: none;
+        }
+
+        .container {
+            position: relative;
+            z-index: 10;
+            width: 90vw;
+            max-width: 1000px;
+            height: 80vh;
+            border: 1px solid var(--secondary);
+            background: rgba(0, 20, 15, 0.85);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 255, 159, 0.1);
+            display: flex;
+            flex-direction: column;
+            border-radius: 4px;
+        }
+
+        .terminal-header {
+            padding: 10px 15px;
+            background: var(--secondary);
+            color: var(--primary);
+            font-size: 12px;
+            letter-spacing: 2px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--primary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
+            box-shadow: var(--glow);
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.5; }
+            to { opacity: 1; }
+        }
+
+        #terminal {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.5;
+            scrollbar-width: thin;
+            scrollbar-color: var(--secondary) transparent;
+        }
+
+        #terminal::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        #terminal::-webkit-scrollbar-thumb {
+            background: var(--secondary);
+        }
+
+        .line {
+            margin-bottom: 4px;
+            display: flex;
+        }
+
+        .prompt {
+            color: var(--primary);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        .cmd {
+            color: #fff;
+            text-shadow: var(--glow);
+        }
+
+        .success { color: #00ff9f; }
+        .warning { color: #ffcc00; }
+        .danger { color: #ff3e3e; }
+        .info { color: #00d4ff; }
+
+        .ascii-art {
+            font-size: 8px;
+            line-height: 8px;
+            white-space: pre;
+            margin: 20px 0;
+            color: var(--primary);
+            text-shadow: var(--glow);
+            display: none;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 2px;
+            background: var(--secondary);
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background: var(--primary);
+            width: 0%;
+            box-shadow: var(--glow);
+            transition: width 0.1s linear;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background: var(--primary);
+            vertical-align: middle;
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0; }
+        }
+
+        .glitch-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 100;
+            display: none;
+            mix-blend-mode: difference;
+        }
+
+        .footer-info {
+            padding: 5px 15px;
+            font-size: 10px;
+            color: var(--secondary);
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid rgba(0, 255, 159, 0.1);
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: 95vw;
+                height: 90vh;
+            }
+            .ascii-art {
+                font-size: 4px;
+                line-height: 4px;
+            }
+            #terminal {
+                font-size: 11px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div class="ui-overlay"></div>
+    <div class="glitch-overlay" id="glitch"></div>
+
+    <div class="container">
+        <div class="terminal-header">
+            <div><span class="status-dot"></span>LUAY_OS v4.0.2-SECURE</div>
+            <div id="clock">00:00:00</div>
+        </div>
+        
+        <div id="terminal">
+            <div class="line"><span class="prompt">SYSTEM:</span><span class="cmd">Iniciando protocolo de handshake...</span></div>
+        </div>
+
+        <div class="footer-info">
+            <div>LOC: 127.0.0.1</div>
+            <div>STATUS: ENCRYPTED</div>
+            <div>BATT: 100%</div>
+        </div>
+    </div>
+
+    <script>
+        const terminal = document.getElementById("terminal");
+        const canvas = document.getElementById("bg-canvas");
+        const ctx = canvas.getContext("2d");
+        const glitch = document.getElementById("glitch");
+        const clock = document.getElementById("clock");
+
+        let width, height, columns;
+        const fontSize = 16;
+        const drops = [];
+
+        function initCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            columns = Math.floor(width / fontSize);
+            for (let i = 0; i < columns; i++) drops[i] = 1;
+        }
+
+        function drawMatrix() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.05)";
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = "#00ff9f";
+            ctx.font = fontSize + "px monospace";
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = String.fromCharCode(Math.random() * 128);
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }
+
+        window.addEventListener("resize", initCanvas);
+        initCanvas();
+        setInterval(drawMatrix, 33);
+
+        function updateClock() {
+            const now = new Date();
+            clock.innerText = now.getHours().toString().padStart(2, '0') + ":" + 
+                            now.getMinutes().toString().padStart(2, '0') + ":" + 
+                            now.getSeconds().toString().padStart(2, '0');
+        }
+        setInterval(updateClock, 1000);
+
+        const logs = [
+            { type: 'info', text: 'Estabelecendo conexão via tunelamento SSH...' },
+            { type: 'info', text: 'Autenticando via Proxy reverso [HK-4]...' },
+            { type: 'success', text: 'Handshake concluído. Latência: 14ms.' },
+            { type: 'info', text: 'Carregando módulos de segurança (LUAY_CORE)...' },
+            { type: 'warning', text: 'Detectada tentativa de interceptação em 192.168.1.1' },
+            { type: 'success', text: 'Firewall ativo. Ameaça neutralizada.' },
+            { type: 'info', text: 'Descriptografando base de dados (AES-256)...' },
+            { type: 'progress', text: 'Processando: ' },
+            { type: 'success', text: 'Integridade dos arquivos verificada (SHA-512).' },
+            { type: 'info', text: 'Injetando interface visual GT-ACCESS...' },
+            { type: 'danger', text: 'ALERTA: Acesso restrito identificado. Ignorando...' },
+            { type: 'success', text: 'Acesso total concedido!' },
+        ];
+
+        const ascii = `
+        ++                                                                                                                                  
+       %%%#                                                                                                                                 
+          %%%%%#                                                                                                                            
+          @%%%%%%%#  =%%%%%%%#+                                                                                                             
+           %%%@@@@%%%%%%@@@@%%%%#                                                                                                           
+           %%%@@@@@@@@@@@%%%%*%%%%                                                                                                          
+         =*%%%@@@%@%%%%%%%-     %%%#                                                                                                        
+     #%%%%%@%@@@%%%%%%%%%%%#* @##* %%%@@@%%%%%%%%%%##%#=%%#                                                                                                                
+   %%%@%%%%%%%%%%#%#=#%#+##+--===++:-=-::::=*+:                                                                                             
+   #%%%%%%  #%*%+=#%#*=::--==+-==-:::....::::--:.:                                                                                          
+    #%%%%* #%%%%#+==::.-=+---=-::         .:::-:...        =#####                                                                          
+     *%%%#*# :=#+===:: .-==---=:..........   .:::....       #%@@@%#                                                                         
+         *%%%-=--==-:: .:-----=:.:=++++++==-:..-:.  ...     #%%@%%#    -*#### @#####    -%%%%* +##**@ **####                             
+            :--====--. .:--===+:=++*****+++==-.::.  ....    #%%@%%#    #@@@%%@@%@@%% #%@%@%%%%%%%*%@@@%@ @@@@%%                             
+            -===-==-:: .:-:==++:++*********++=:.:.   ...    #%%@%%#    #@@@%%@@@@@@% %%@@%%%@@@%%% %@@%* %@@@%@                             
+           ---=+---:.:  ::.:-=--++**********++:...-: ::..   #%%@%%#    #@@@%%@@@@@%% %%%%%% %@@%%% %%@%% %@@%%                              
+           ==--==---... . ---=++*************+*- .-: .:..   #%%@%%#    #@@@%%@@%@@%%    *%%%%@@%%% %%@%%#%@%%=                              
+           :::-=-..::....+***********#####*****+ ...  ..    #%%@%%#    #@@@%%@@%@@@%  %%%@%%%@@@%@ @%%@%%%@%%                               
+           ::---.. ......+*######***######****** ...        #%%@%%#    #@@@%%@@@@@%% @@@@%% %@@@%@ *%@%%@%@@#                               
+            :::..  ..:::.**################***#* .         #%@@%%#    #@@@%%%@%@@@% %@@@%% %@@@%@  %@@@#%@%@                               
+                 ...::--:+*################**##*:.          #%@@@%%%%%%*%@@%%*%%@@%% %%%%%%#%@@%%%  %%%@@%%%#                               
+                  .:=--::=*###############****##+           #%@@@@@%%@%-%%%@@%%%@@@% %%%@@%%%@@%%%  *%%@@@%%                                
+                    #%###*********************##            #%%%%%%%%%%  #%%%#@%%%%%  =%%%%#%@%%%@ @@%%%@%%%                                
+                     ####*********+++++++++**#* +@@%%@%%%#                                
+                      ###****+++++++++**#####                                                      %@%%%@%@`;
+
+        async function writeLine(log) {
+            const line = document.createElement("div");
+            line.className = "line";
+            
+            const prompt = document.createElement("span");
+            prompt.className = "prompt";
+            prompt.innerText = ">_";
+            line.appendChild(prompt);
+
+            const content = document.createElement("span");
+            content.className = log.type;
+            line.appendChild(content);
+            terminal.appendChild(line);
+
+            if (log.type === 'progress') {
+                content.innerText = log.text;
+                const pContainer = document.createElement("div");
+                pContainer.className = "progress-container";
+                const pBar = document.createElement("div");
+                pBar.className = "progress-bar";
+                pContainer.appendChild(pBar);
+                line.appendChild(pContainer);
+
+                for (let i = 0; i <= 100; i += 2) {
+                    pBar.style.width = i + "%";
+                    await new Promise(r => setTimeout(r, 15));
+                }
+            } else {
+                const text = log.text;
+                for (let i = 0; i < text.length; i++) {
+                    content.innerText += text[i];
+                    await new Promise(r => setTimeout(r, 15));
+                    terminal.scrollTop = terminal.scrollHeight;
+                }
+            }
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        async function start() {
+            for (const log of logs) {
+                await writeLine(log);
+            }
+
+            await new Promise(r => setTimeout(r, 500));
+            terminal.innerHTML = "";
+            
+            const asciiContainer = document.createElement("div");
+            asciiContainer.className = "ascii-art";
+            asciiContainer.style.display = "block";
+            asciiContainer.innerText = ascii;
+            terminal.appendChild(asciiContainer);
+
+            // Efeito final
+            glitch.style.display = "block";
+            setTimeout(() => glitch.style.display = "none", 100);
+            setTimeout(() => glitch.style.display = "block", 150);
+            setTimeout(() => glitch.style.display = "none", 200);
+
+            setTimeout(() => {
+                window.location.href = "https://luay.gt.tc/luayGTaccess/?P";
+            }, 2000);
+        }
+
+        window.onload = start;
+    </script>
+</body>
+</html>
